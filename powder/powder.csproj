@@ -13,7 +13,6 @@
 
     <ItemGroup>
       <None Remove="Resources\aseprite_font.png" />
-      <EmbeddedResource Include="Resources\aseprite_font.png" />
       <None Remove="Resources\vga-font.png" />
       <EmbeddedResource Include="Resources\vga-font.png" />
     </ItemGroup>
