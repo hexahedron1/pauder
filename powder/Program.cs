@@ -43,6 +43,17 @@ public static class Program {
 
     private static bool _firstLog = true;
     public static bool SaveLog { get; set; } = true;
+    public static double t = 0;
+
+    public static void WakeUp(int x, int y) {
+        for (int dx = x - 1; dx <= x + 1; dx++) {
+            for (int dy = y - 1; dy <= y + 1; dy++) {
+                if (collision[dx, dy] && !updates.Contains((dx, dy))) updates.Add((dx, dy)); 
+            }
+        }
+    }
+
+    public const bool DebugDraw = false;
     public static void Main(string[] args) {
         if (!SDL.Init(SDL.InitFlags.Video | SDL.InitFlags.Events)) {
             SDL.LogError(SDL.LogCategory.System, $"Failed to init SDL: {SDL.GetError()}");
@@ -63,7 +74,8 @@ public static class Program {
         }
         #region Materials
         materials = [
-            new("Sand", new NoiseBrush(0xBFA68B,
+            new("Sand", new NoiseBrush( 
+                0xBFA68B,
                 0xC3AF91,
                 0xB79073,
                 0xAB947D,
@@ -101,6 +113,7 @@ public static class Program {
         DateTime lastFrame = DateTime.Now;
         bool lmb = false;
         bool rmb = false;
+        bool paused = false;
         while (true) {
             Thread.Sleep(1000/60);
             while (SDL.PollEvent(out var e)) {
@@ -125,6 +138,9 @@ public static class Program {
                         if ((a & SDL.MouseButtonFlags.Left) == 0) lmb = false;
                         if ((a & SDL.MouseButtonFlags.Right) == 0) rmb = false;
                         break;
+                    case SDL.EventType.KeyDown:
+                        if (e.Key.Key == SDL.Keycode.Space) paused = !paused;
+                        break;
                 }
             }
 
@@ -135,6 +151,7 @@ public static class Program {
                     Pixel piksel = new(materials[selected], cx, cy);
                     pixels.Add(piksel);
                     collision[cx, cy] = true;
+                    WakeUp(cx, cy);
                 }
             }
 
@@ -167,6 +184,19 @@ public static class Program {
                 };
                 SDL.RenderFillRect(renderer,  rect);
             }
+
+            if (DebugDraw) {
+                foreach (var (ux, uy) in updates) {
+                    SDL.SetRenderDrawColor(renderer, 40, 125, 204, 96);
+                    rect = new SDL.FRect {
+                        X = xo + ux * scale,
+                        Y = yo + uy * scale,
+                        W = scale, H = scale
+                    };
+                    SDL.RenderRect(renderer, rect);
+                }
+            }
+
             if (cx is >= 0 and < width && cy is >= 0 and < height) {
                 SDL.HideCursor();
                 rect = new SDL.FRect {
@@ -179,10 +209,14 @@ public static class Program {
             } else {
                 SDL.ShowCursor();
             }
-            int fps = 1000/Math.Max((DateTime.Now - lastFrame).Milliseconds, 1);
+
+            int ms = (DateTime.Now - lastFrame).Milliseconds;
+            int fps = 1000/Math.Max(ms, 1);
+            t = t += ms / 1000.0;
             RegularFont.DrawText(renderer, $"{fps} FPS", 8, 8, 0xFFFFFF);
             RegularFont.DrawText(renderer, $"{materials[selected].Name}", 8, 20, 0x00FFFF);
-            RegularFont.DrawText(renderer, $"{pixels.Count} particles", 8, 32, 0x00FFFF);
+            RegularFont.DrawText(renderer, $"{pixels.Count} particles", 8, 32, 0xFFFFFF);
+            if (paused) RegularFont.DrawText(renderer, "Paused", 8, 44, 0xFFFF00);
             SDL.RenderPresent(renderer);
             lastFrame = DateTime.Now;
             #endregion
@@ -224,6 +258,15 @@ public static class Program {
             _firstLog = false;
         }
         File.AppendAllLines(Path.Join(folder, "latest-log.txt"), logLines);
+    }
+    [Pure]
+    public static int PackColor(byte r, byte g, byte b) {
+        return r << 16 |  g << 8 | b;
+    }
+    [Pure]
+    public static int PackColor((byte, byte, byte) color) {
+        var (r, g, b) = color;
+        return PackColor(r, g, b);
     }
     [Pure]
     public static (byte, byte, byte) UnpackColor(int color) {

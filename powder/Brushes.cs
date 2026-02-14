@@ -12,3 +12,15 @@ public readonly struct NoiseBrush(params int[] colors) : IBrush {
         return colors[new Random(pixel.GetHashCode()).Next(0, colors.Length)];
     }
 }
+
+public readonly struct PulseNoiseBrush(double sweep, params int[] colors) : IBrush {
+    public int GetColor(Pixel pixel) {
+        Random rand = new Random(pixel.GetHashCode());
+        var (r, g, b) = UnpackColor(colors[rand.Next(0, colors.Length)]);
+        double sin = Math.Sin(t + rand.Next(0, 628)/100.0)/2*sweep+0.5;
+        r = (byte)(r * sin);
+        g = (byte)(g * sin);
+        b = (byte)(b * sin);
+        return PackColor(r, g, b);
+    }
+}
