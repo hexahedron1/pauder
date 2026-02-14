@@ -54,6 +54,8 @@ public static class Program {
         }
     }
 
+    public static Pixel? FindPixel(int x, int y) => pixels.FirstOrDefault(pixel => pixel.X == x && pixel.Y == y);
+
     public const bool DebugDraw = false;
     public static void Main(string[] args) {
         if (!SDL.Init(SDL.InitFlags.Video | SDL.InitFlags.Events)) {
@@ -153,6 +155,15 @@ public static class Program {
                     pixels.Add(piksel);
                     collision[cx, cy] = true;
                     WakeUp(cx, cy);
+                }
+
+                if (rmb && collision[cx, cy]) {
+                    Pixel? picksell = FindPixel(cx, cy);
+                    if (picksell != null) {
+                        pixels.Remove(picksell.Value);
+                        collision[cx, cy] = false;
+                        WakeUp(cx, cy);
+                    }
                 }
             }
 
