@@ -48,7 +48,8 @@ public static class Program {
     public static void WakeUp(int x, int y) {
         for (int dx = x - 1; dx <= x + 1; dx++) {
             for (int dy = y - 1; dy <= y + 1; dy++) {
-                if (collision[dx, dy] && !updates.Contains((dx, dy))) updates.Add((dx, dy)); 
+                if (dx is > 0 and <= width && dy is > 0 and < height && collision[dx, dy] && !updates.Contains((dx, dy)))
+                    updates.Add((dx, dy)); 
             }
         }
     }
