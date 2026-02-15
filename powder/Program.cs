@@ -212,18 +212,18 @@ public static class Program {
                                 WakeUp(ux, uy);
                                 if (pigsel.Grip > 0 && neighbors.Length > 0) pigsel.Grip -= dt;
                                 else {
-                                    if (!Occupied(ux, uy + 1) || FindPixel(ux, uy + 1)?.Moving != false) {
+                                    if ((!Occupied(ux, uy + 1) || FindPixel(ux, uy + 1)?.Moving != false) && !IsOutOfBounds(ux, uy + 1)) {
                                         pigsel.Y += 1;
                                         collision[ux, uy] = false;
                                         collision[ux, uy + 1] = true;
                                     }
-                                    else if (!Occupied(ux - 1, uy + 1) || FindPixel(ux - 1, uy + 1)?.Moving != false) {
+                                    else if ((!Occupied(ux - 1, uy + 1) || FindPixel(ux - 1, uy + 1)?.Moving != false) && !IsOutOfBounds(ux - 1, uy + 1)) {
                                         pigsel.Y += 1;
                                         pigsel.X -= 1;
                                         collision[ux, uy] = false;
                                         collision[ux - 1, uy + 1] = true;
                                     }
-                                    else if (!Occupied(ux + 1, uy + 1) || FindPixel(ux + 1, uy + 1)?.Moving != false) {
+                                    else if ((!Occupied(ux + 1, uy + 1) || FindPixel(ux + 1, uy + 1)?.Moving != false) && !IsOutOfBounds(ux + 1, uy + 1)) {
                                         pigsel.Y += 1;
                                         pigsel.X += 1;
                                         collision[ux, uy] = false;
