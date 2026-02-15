@@ -9,8 +9,10 @@ public static class Program {
     const int width = 120;
     const int height = 80;
     const int scale = 6;
-    const int winWidth = 1080;
-    const int winHeight = 720;
+    const int xbezel = 1;
+    const int ybezel = 128;
+    const int winWidth = width * scale + xbezel;
+    const int winHeight = height * scale + ybezel;
     private static IntPtr window;
     private static IntPtr renderer;
     public static List<Pixel> pixels = [];
