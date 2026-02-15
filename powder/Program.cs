@@ -1,5 +1,4 @@
-﻿global using powder;
-using System.Diagnostics.Contracts;
+﻿using System.Diagnostics.Contracts;
 using System.Reflection;
 using SDL3;
 
@@ -19,11 +18,12 @@ public static class Program {
     public static List<(int, int)> updates = [];
     public static List<Material> materials = [];
     public static bool[,] collision = new bool[width, height];
-    private static int cx = 0;
-    private static int cy = 0;
-    private static Font RegularFont;
+    private static int cx;
+    private static int cy;
+    private static Font? RegularFont;
     private static bool picker = false;
     public static int selected = 0;
+    public static Random GlobalRandom = new();
     private static void ExtractResource(string name, string path) {
         Log($"Extracting {name} to {path}", "Resources");
         using var resource = Assembly.GetExecutingAssembly().GetManifestResourceStream(name);
@@ -44,13 +44,13 @@ public static class Program {
     }
 
     private static bool _firstLog = true;
-    public static bool SaveLog { get; set; } = true;
-    public static double t = 0;
+    public static bool SaveLog { get; set; } = false;
+    public static double t;
 
     public static void WakeUp(int x, int y) {
         for (int dx = x - 1; dx <= x + 1; dx++) {
             for (int dy = y - 1; dy <= y + 1; dy++) {
-                if (dx is > 0 and <= width && dy is > 0 and < height && collision[dx, dy] && !updates.Contains((dx, dy)))
+                if (!IsOutOfBounds(dx, dy) && collision[dx, dy] && !updates.Contains((dx, dy)))
                     updates.Add((dx, dy)); 
             }
         }
@@ -58,7 +58,26 @@ public static class Program {
 
     public static Pixel? FindPixel(int x, int y) => pixels.FirstOrDefault(pixel => pixel.X == x && pixel.Y == y);
 
-    public const bool DebugDraw = false;
+    public static (int, int)[] Neighbors(int x, int y) {
+        List<(int, int)> neighbors = [];
+        for (int dx = x - 1; dx <= x + 1; dx++) {
+            for (int dy = y - 1; dy <= y + 1; dy++) {
+                if (!(dx == x && dy == y) && Occupied(dx, dy))
+                    neighbors.Add((dx, dy));
+            }
+        }
+        return neighbors.ToArray();
+    }
+    public static bool DebugDraw;
+
+    public static bool Occupied(int x, int y) {
+        if (IsOutOfBounds(x, y)) return true;
+        return collision[x, y];
+    }
+
+    public static bool IsOutOfBounds(int x, int y) {
+        return x < 0 || x >= width || y < 0 || y >= height;
+    }
     public static void Main(string[] args) {
         if (!SDL.Init(SDL.InitFlags.Video | SDL.InitFlags.Events)) {
             SDL.LogError(SDL.LogCategory.System, $"Failed to init SDL: {SDL.GetError()}");
@@ -115,12 +134,14 @@ public static class Program {
         renderer = SDL.CreateRenderer(window, null);
         float xo = (winWidth - width * scale) / 2f;
         float yo = (winHeight - height * scale) / 2f;
-        DateTime lastFrame = DateTime.Now;
+        DateTime lastTick = DateTime.Now;
         bool lmb = false;
         bool rmb = false;
         bool paused = false;
+        bool step = false;
+        double dt = 0;
         while (true) {
-            Thread.Sleep(1000/60);
+            Thread.Sleep(16);
             while (SDL.PollEvent(out var e)) {
                 switch ((SDL.EventType)e.Type) {
                     case SDL.EventType.WindowCloseRequested:
@@ -130,8 +151,8 @@ public static class Program {
                         return;
                     case SDL.EventType.MouseMotion:
                         SDL.GetMouseState(out float mx, out float my);
-                        cx = (int)((mx - xo)/scale);
-                        cy = (int)((my - yo)/scale);
+                        cx = (int)((mx - xo) / scale);
+                        cy = (int)((my - yo) / scale);
                         break;
                     case SDL.EventType.MouseButtonDown:
                         var a = SDL.GetMouseState(out _, out _);
@@ -145,6 +166,14 @@ public static class Program {
                         break;
                     case SDL.EventType.KeyDown:
                         if (e.Key.Key == SDL.Keycode.Space) paused = !paused;
+                        if (e.Key.Key == SDL.Keycode.Z) step = true;
+                        if (e.Key.Key == SDL.Keycode.D) DebugDraw = !DebugDraw;
+                        if (e.Key.Key == SDL.Keycode.C) {
+                            foreach (var p in pixels.ToArray()) {
+                                collision[p.X, p.Y] = false;
+                                pixels.Remove(p);
+                            }
+                        }
                         break;
                 }
             }
@@ -162,41 +191,87 @@ public static class Program {
                 if (rmb && collision[cx, cy]) {
                     Pixel? picksell = FindPixel(cx, cy);
                     if (picksell != null) {
-                        pixels.Remove(picksell.Value);
+                        pixels.Remove(picksell);
                         collision[cx, cy] = false;
                         WakeUp(cx, cy);
                     }
                 }
             }
 
+            if (!paused || step) {
+                foreach (var (ux, uy) in updates.ToArray()) {
+                    var piskel = FindPixel(ux, uy);
+                    var neighbors = Neighbors(ux, uy);
+                    if (piskel is { } pigsel) {
+                        if (neighbors.All(x =>
+                                (IsOutOfBounds(x.Item1, x.Item1) ||
+                                 FindPixel(x.Item1, x.Item2)?.Material == piskel.Material) && neighbors.Length == 8))
+                            updates.Remove((ux, uy));
+                        if (pigsel.State == State.Solid) {
+                            if (!Occupied(ux - 1, uy + 1) || !Occupied(ux, uy + 1) || !Occupied(ux + 1, uy + 1)) {
+                                WakeUp(ux, uy);
+                                if (pigsel.Grip > 0 && neighbors.Length > 0) pigsel.Grip -= dt;
+                                else {
+                                    if (!Occupied(ux, uy + 1) || FindPixel(ux, uy + 1)?.Grip is null or <= 0) {
+                                        pigsel.Y += 1;
+                                        collision[ux, uy] = false;
+                                        collision[ux, uy + 1] = true;
+                                    }
+                                    else if (!Occupied(ux - 1, uy + 1) || FindPixel(ux - 1, uy + 1)?.Grip is null or <= 0) {
+                                        pigsel.Y += 1;
+                                        pigsel.X -= 1;
+                                        collision[ux, uy] = false;
+                                        collision[ux - 1, uy + 1] = true;
+                                    }
+                                    else if (!Occupied(ux + 1, uy + 1) || FindPixel(ux + 1, uy + 1)?.Grip is null or <= 0) {
+                                        pigsel.Y += 1;
+                                        pigsel.X += 1;
+                                        collision[ux, uy] = false;
+                                        collision[ux + 1, uy + 1] = true;
+                                    }
+
+                                    WakeUp(pigsel.X, pigsel.Y);
+                                }
+                            }
+                        }
+                    }
+                    else updates.Remove((ux, uy));
+                }
+
+                step = false;
+            }
+
             #endregion
 
+            int ms = (DateTime.Now - lastTick).Milliseconds;
+            dt = ms / 1000.0;
+            t += dt;
             #region Rendering
             SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0);
             SDL.RenderClear(renderer);
             SDL.FRect rect = new SDL.FRect {
                 X = xo - 1,
                 Y = yo - 1,
-                W = width*scale + 2, H = height*scale + 2
+                W = width * scale + 2, H = height * scale + 2
             };
             SDL.SetRenderDrawColor(renderer, 255, 255, 255, 255);
-            SDL.RenderRect(renderer,  rect);
+            SDL.RenderRect(renderer, rect);
             rect = new SDL.FRect {
                 X = xo,
                 Y = yo,
-                W = width*scale, H = height*scale
+                W = width * scale, H = height * scale
             };
             SDL.SetRenderDrawColor(renderer, 18, 20, 34, 255);
-            SDL.RenderFillRect(renderer,  rect);
+            SDL.RenderFillRect(renderer, rect);
             foreach (var piggsel in pixels) {
                 var (r, g, b) = UnpackColor(piggsel.Material.Brush.GetColor(piggsel));
                 SDL.SetRenderDrawColor(renderer, r, g, b, 255);
                 rect = new SDL.FRect {
-                    X = xo + piggsel.X*scale,
-                    Y = yo + piggsel.Y*scale,
+                    X = xo + piggsel.X * scale,
+                    Y = yo + piggsel.Y * scale,
                     W = scale, H = scale
                 };
-                SDL.RenderFillRect(renderer,  rect);
+                SDL.RenderFillRect(renderer, rect);
             }
 
             if (DebugDraw) {
@@ -214,25 +289,31 @@ public static class Program {
             if (cx is >= 0 and < width && cy is >= 0 and < height) {
                 SDL.HideCursor();
                 rect = new SDL.FRect {
-                    X = xo + cx*scale,
-                    Y = yo + cy*scale,
+                    X = xo + cx * scale,
+                    Y = yo + cy * scale,
                     W = scale, H = scale
                 };
                 SDL.SetRenderDrawColor(renderer, 255, 255, 255, 255);
-                SDL.RenderRect(renderer,  rect);
-            } else {
+                SDL.RenderRect(renderer, rect);
+            }
+            else {
                 SDL.ShowCursor();
             }
 
-            int ms = (DateTime.Now - lastFrame).Milliseconds;
-            int fps = 1000/Math.Max(ms, 1);
-            t = t += ms / 1000.0;
+            int fps = 1000 / Math.Max(ms, 1);
             RegularFont.DrawText(renderer, $"{fps} FPS", 8, 8, 0xFFFFFF);
             RegularFont.DrawText(renderer, $"{materials[selected].Name}", 8, 20, 0x00FFFF);
             RegularFont.DrawText(renderer, $"{pixels.Count} particles", 8, 32, 0xFFFFFF);
-            if (paused) RegularFont.DrawText(renderer, "Paused", 8, 44, 0xFFFF00);
+            RegularFont.DrawText(renderer, $"{updates.Count} updates", 8, 44, 0xFFFFFF);
+            Pixel? hover = FindPixel(cx, cy);
+            if (hover != null) {
+                var neigh = Neighbors(cx, cy);
+                RegularFont.DrawText(renderer, $"{hover.Grip}, {neigh.Length}", 8, 56, 0xFFFFFF);
+            }
+
+            if (paused) RegularFont.DrawText(renderer, "Paused", 8, 68, 0xFFFF00);
             SDL.RenderPresent(renderer);
-            lastFrame = DateTime.Now;
+            lastTick = DateTime.Now;
             #endregion
         }
     }
