@@ -1,3 +1,4 @@
+using static powder.Program;
 namespace powder;
 
 public enum State {
