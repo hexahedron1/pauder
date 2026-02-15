@@ -16,6 +16,7 @@ public class Pixel(Material material, int x, int y) : IEquatable<Pixel> {
     public double IncomingEnergy = 0.0; // J
     public double Temperature = 0.0; // °C
     public double LastAwake = 0.0;
+    public bool Moving;
     public int MagicNumber { get; } = GlobalRandom.Next(int.MaxValue);
     
     public bool Equals(Pixel? other) {

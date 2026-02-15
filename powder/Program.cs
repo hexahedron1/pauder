@@ -8,8 +8,8 @@ public static class Program {
     const int width = 120;
     const int height = 80;
     const int scale = 6;
-    const int xbezel = 1;
-    const int ybezel = 128;
+    const int xbezel = 128;
+    const int ybezel = 256;
     const int winWidth = width * scale + xbezel;
     const int winHeight = height * scale + ybezel;
     private static IntPtr window;
@@ -212,18 +212,18 @@ public static class Program {
                                 WakeUp(ux, uy);
                                 if (pigsel.Grip > 0 && neighbors.Length > 0) pigsel.Grip -= dt;
                                 else {
-                                    if (!Occupied(ux, uy + 1) || FindPixel(ux, uy + 1)?.Grip is null or <= 0) {
+                                    if (!Occupied(ux, uy + 1) || FindPixel(ux, uy + 1)?.Moving != false) {
                                         pigsel.Y += 1;
                                         collision[ux, uy] = false;
                                         collision[ux, uy + 1] = true;
                                     }
-                                    else if (!Occupied(ux - 1, uy + 1) || FindPixel(ux - 1, uy + 1)?.Grip is null or <= 0) {
+                                    else if (!Occupied(ux - 1, uy + 1) || FindPixel(ux - 1, uy + 1)?.Moving != false) {
                                         pigsel.Y += 1;
                                         pigsel.X -= 1;
                                         collision[ux, uy] = false;
                                         collision[ux - 1, uy + 1] = true;
                                     }
-                                    else if (!Occupied(ux + 1, uy + 1) || FindPixel(ux + 1, uy + 1)?.Grip is null or <= 0) {
+                                    else if (!Occupied(ux + 1, uy + 1) || FindPixel(ux + 1, uy + 1)?.Moving != false) {
                                         pigsel.Y += 1;
                                         pigsel.X += 1;
                                         collision[ux, uy] = false;
@@ -233,6 +233,7 @@ public static class Program {
                                     WakeUp(pigsel.X, pigsel.Y);
                                 }
                             }
+                            pigsel.Moving = pigsel.X != ux || pigsel.Y != uy;
                         }
                     }
                     else updates.Remove((ux, uy));
@@ -308,7 +309,7 @@ public static class Program {
             Pixel? hover = FindPixel(cx, cy);
             if (hover != null) {
                 var neigh = Neighbors(cx, cy);
-                RegularFont.DrawText(renderer, $"{hover.Grip}, {neigh.Length}", 8, 56, 0xFFFFFF);
+                RegularFont.DrawText(renderer, $"{hover.Grip}, {neigh.Length}, {hover.Moving}", 8, 56, 0xFFFFFF);
             }
 
             if (paused) RegularFont.DrawText(renderer, "Paused", 8, 68, 0xFFFF00);
