@@ -22,7 +22,7 @@ public static class Program {
     private static int cy;
     private static Font? RegularFont;
     private static bool picker = false;
-    public static int selected = 0;
+    public static int selected = 1;
     public static Random GlobalRandom = new();
     private static void ExtractResource(string name, string path) {
         Log($"Extracting {name} to {path}", "Resources");
@@ -114,7 +114,20 @@ public static class Program {
                 0xB9A388,
                 0xB9A287,
                 0xB79A71
-            ))
+            )),
+            new("Gravel", new NoiseBrush(
+                0xAAAAAA,
+                0x919290,
+                0x7B7E76,
+                0x8F8C90,
+                0xB2B4B1,
+                0x727668,
+                0x757774,
+                0x898A85,
+                0x94969F,
+                0x525252,
+                0x838581
+            ), density: 1.8)
         ];
         #endregion
         Log("Loading regular font", "Resources");
@@ -164,6 +177,10 @@ public static class Program {
                         if ((a & SDL.MouseButtonFlags.Left) == 0) lmb = false;
                         if ((a & SDL.MouseButtonFlags.Right) == 0) rmb = false;
                         break;
+                    case SDL.EventType.MouseWheel:
+                        selected = (int)Math.Min(Math.Max(selected + e.Wheel.Y, 0), materials.Count - 1);
+                        Log($"{e.Wheel.Y}", severity: LogSeverity.Debug);
+                        break;
                     case SDL.EventType.KeyDown:
                         if (e.Key.Key == SDL.Keycode.Space) paused = !paused;
                         if (e.Key.Key == SDL.Keycode.Z) step = true;
@@ -174,6 +191,11 @@ public static class Program {
                                 pixels.Remove(p);
                             }
                         }
+
+                        if (e.Key.Key == SDL.Keycode.LAlt) picker = true;
+                        break;
+                    case SDL.EventType.KeyUp:
+                        if (e.Key.Key == SDL.Keycode.LAlt) picker = false;
                         break;
                 }
             }
@@ -187,7 +209,6 @@ public static class Program {
                     collision[cx, cy] = true;
                     WakeUp(cx, cy);
                 }
-
                 if (rmb && collision[cx, cy]) {
                     Pixel? picksell = FindPixel(cx, cy);
                     if (picksell != null) {
@@ -207,6 +228,7 @@ public static class Program {
                                 (IsOutOfBounds(x.Item1, x.Item1) ||
                                  FindPixel(x.Item1, x.Item2)?.Material == piskel.Material) && neighbors.Length == 8))
                             updates.Remove((ux, uy));
+                        if (!collision[pigsel.X, pigsel.Y]) collision[pigsel.X, pigsel.Y] = true;
                         if (pigsel.State == State.Solid) {
                             if (!Occupied(ux - 1, uy + 1) || !Occupied(ux, uy + 1) || !Occupied(ux + 1, uy + 1)) {
                                 WakeUp(ux, uy);
@@ -232,6 +254,13 @@ public static class Program {
 
                                     WakeUp(pigsel.X, pigsel.Y);
                                 }
+                            } else if (Occupied(ux, uy + 1) && !IsOutOfBounds(ux, uy + 1) &&
+                                       FindPixel(ux, uy + 1)!.Material.Density < pigsel.Material.Density) {
+                                Pixel below = FindPixel(ux, uy + 1)!;
+                                below.Y -= 1;
+                                pigsel.Y += 1;
+                                WakeUp(ux, uy);
+                                WakeUp(ux, uy + 1);
                             }
                             pigsel.Moving = pigsel.X != ux || pigsel.Y != uy;
                         }
