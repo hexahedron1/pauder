@@ -1,6 +1,6 @@
 # Todo list
 
-1. [ ] Powder physics
+1. [+] Powder physics
    1. [ ] Sticking
 2. [ ] Liquid physics
    1. [ ] Solvents? 
